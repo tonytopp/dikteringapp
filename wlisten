@@ -1,0 +1,55 @@
+#!/bin/bash
+
+echo "🎧 Say 'whisper' then your message"
+echo "Press Ctrl+C to stop"
+
+# Set terminal title
+echo -ne "\033]0;🎧 Whisper - Ready\007"
+
+while true; do
+    # Listen for 2 seconds
+    sox -q -d -r 16000 -c 1 /tmp/check.wav trim 0 2
+    
+    # Transcribe and extract ONLY the text (no timestamps)
+    output=$(whisper-cli -m ~/.whisper-models/ggml-base.bin /tmp/check.wav 2>&1)
+    # Get just the lines with transcribed text (not timestamps, not whisper debug)
+    check=$(echo "$output" | grep -E "^\[" | sed 's/\[[^]]*\][[:space:]]*//' | tr '\n' ' ')
+    
+    # If we heard "whisper"
+    if echo "$check" | grep -iq "whisper"; then
+        echo "✨ Activated!"
+        echo "🎤 Listening..."
+        # Set terminal title to show recording
+        echo -ne "\033]0;🔴 RECORDING - Whisper\007"
+        # Native macOS notification
+        osascript -e 'display notification "Recording..." with title "Whisper" sound name "Tink"'
+        
+        # Record for up to 30 seconds or until 2 seconds of silence
+        sox -d -r 16000 -c 1 /tmp/msg.wav silence 1 0.1 1% 1 2.0 1% trim 0 30
+        
+        # Transcribe the message
+        echo "Transcribing..."
+        output2=$(whisper-cli -m ~/.whisper-models/ggml-base.bin /tmp/msg.wav 2>&1)
+        # Extract just the text, combine all lines
+        message=$(echo "$output2" | grep -E "^\[" | sed 's/\[[^]]*\][[:space:]]*//' | tr '\n' ' ')
+        
+        # Remove "whisper" from start if present
+        message=$(echo "$message" | sed -E 's/^[Ww]hisper[,.]? *//')
+        
+        if [ -n "$message" ]; then
+            echo "📝 $message"
+            echo -n "$message" | pbcopy
+            echo "✅ Copied!"
+            # Show notification with preview
+            preview=$(echo "$message" | cut -c1-50)
+            osascript -e "display notification \"$preview...\" with title \"Whisper\" subtitle \"Copied to clipboard\""
+        else
+            echo "❌ No message captured"
+        fi
+        
+        echo ""
+        rm -f /tmp/msg.wav
+    fi
+    
+    rm -f /tmp/check.wav
+done
