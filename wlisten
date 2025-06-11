@@ -12,13 +12,6 @@ while true; do
     # Get just the lines with transcribed text (not timestamps, not whisper debug)
     check=$(echo "$output" | grep -E "^\[" | sed 's/\[[^]]*\][[:space:]]*//' | tr '\n' ' ')
     
-    # Show what we heard
-    if [ -n "$check" ]; then
-        echo "Heard: $check"
-    else
-        echo -n "."
-    fi
-    
     # If we heard "whisper"
     if echo "$check" | grep -iq "whisper"; then
         echo "✨ Activated!"
